@@ -1,5 +1,6 @@
 {
     "//build": "Recursively run the 'pnpm build' command in the 'packages/*' as defined in the 'pnpm-workspace.yml'",
+    "//pnpm-workspace": "This file tells pnpm where to look for subfolders that represent packages in a monorepo, typically by specifying the 'packages' directory pattern.",
     "name": "seeds",
     "version": "0.0.1",
     "private": true,
