@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { SeedPacketModel } from '../../src/models/seed-packet.model.js'
+import { SeedPacketModel } from '@seeds/models'
 
 // Mock global fetch for server tests
 global.fetch = vi.fn()

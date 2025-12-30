@@ -4,7 +4,6 @@
 	"version": "0.0.0",
 	"type": "module",
 	"scripts": {
-		"dev-server": "tsx --watch --watch-preserve-output src/server/index.ts",
 		"dev-client": "vite",
 		"dev": "concurrently -n \"Server,Client\" -c \"yellow,blue\" \"pnpm run dev-server\" \"pnpm run dev-client\"",
 		"build": "vite build",
@@ -48,6 +47,7 @@
 		"vitest": "^3.2.3"
 	},
 	"dependencies": {
+		"@seeds/models": "workspace:*",
 		"cors": "^2.8.5",
 		"express": "^5.1.0",
 		"winston": "^3.17.0",

@@ -45,13 +45,16 @@ When you run a React (or Svelte) application built with TypeScript and Vite, thr
 
 **Key Options Explained**:
 
-- **`noEmit: true`**: Critical for Vite projects! Tells TypeScript to ONLY check types, not generate output files. Vite handles the transpilation.
+- **`noEmit: true`**: **CRITICAL for Vite projects!** Tells TypeScript to ONLY check types, not generate output files. With this setting:
+  - `target` and `module` only **validate syntax** during development
+  - They do NOT affect your production code (Vite handles all transpilation)
+  - TypeScript becomes a pure type-checker, not a compiler
 
 - **`isolatedModules: true`**: Ensures each file can be transpiled independently (required for esbuild/Vite). Prevents features like `const enum` that require cross-file analysis.
 
-- **`moduleResolution: "bundler"`**: Modern resolution strategy that aligns with how bundlers (like Vite) resolve modules. Allows imports like `import styles from './App.module.css'`.
+- **`moduleResolution: "bundler"`**: Modern resolution strategy that aligns with how bundlers (like Vite) resolve modules. This is **validation-only** - tells TypeScript how to find types, but Vite uses its own resolver at build time.
 
-- **`jsx: "react-jsx"`**: For React 17+, transforms JSX without needing to import React in every file.
+- **`jsx: "react-jsx"`**: For React 17+, transforms JSX without needing to import React in every file. Note: With `noEmit: true`, this only validates JSX syntax - Vite's React plugin does the actual transformation.
 
 ---
 
@@ -230,18 +233,22 @@ The `"type"` field in `package.json` and the `"module"` option in `tsconfig.json
 - Determines syntax for `.js`, `.jsx`, `.ts`, `.tsx` files
 
 ### `tsconfig.json` → `"module"` option
-- Controls what **module format TypeScript emits** when transpiling
+- **Development:** Validates module syntax (e.g., enforces ESM rules)
+- **Build (when noEmit: false):** Controls what **module format TypeScript emits** when transpiling
+- **Build (when noEmit: true - Vite):** No effect on output, validation only
 - Options: `"commonjs"`, `"esnext"`, `"node16"`, `"nodenext"`, etc.
 
 ### Compatibility Matrix
 
+**⚠️ Important:** This matrix only matters when TypeScript emits files (`noEmit: false`). For Vite projects with `noEmit: true`, TypeScript doesn't emit files, so mismatches won't cause runtime errors.
+
 | package.json `"type"` | tsconfig.json `"module"` | Result |
 |----------------------|--------------------------|--------|
-| `"module"` | `"ESNext"` or `"ES2020"` | ✅ Recommended for Vite projects |
-| `"module"` | `"NodeNext"` | ✅ Works, uses Node's ESM resolution |
-| `"commonjs"` or omitted | `"CommonJS"` | ✅ Traditional Node.js projects |
-| `"module"` | `"CommonJS"` | ⚠️ Mismatch - tsc emits CommonJS but Node expects ESM |
-| `"commonjs"` | `"ESNext"` | ⚠️ Mismatch - tsc emits ESM but Node expects CommonJS |
+| `"module"` | `"ESNext"` or `"ES2020"` | ✅ Recommended for Vite projects (validation aligns with modern ESM) |
+| `"module"` | `"NodeNext"` | ✅ Works, uses Node's ESM resolution for validation |
+| `"commonjs"` or omitted | `"CommonJS"` | ✅ Traditional Node.js projects (when emitting files) |
+| `"module"` | `"CommonJS"` | ⚠️ Validation mismatch, but no runtime issue in Vite (noEmit: true)<br>❌ Runtime error if `noEmit: false` (tsc emits CommonJS but Node expects ESM) |
+| `"commonjs"` | `"ESNext"` | ⚠️ Validation mismatch, but no runtime issue in Vite (noEmit: true)<br>❌ Runtime error if `noEmit: false` (tsc emits ESM but Node expects CommonJS) |
 
 **Example: Vite + React Project (Recommended)**
 
@@ -264,10 +271,11 @@ The `"type"` field in `package.json` and the `"module"` option in `tsconfig.json
 ```
 
 **Why this works**:
-- `package.json` tells Node.js to treat `.js` files as ESM
-- `tsconfig.json` tells TypeScript to understand ESM syntax
-- `noEmit: true` means TypeScript doesn't output files anyway (Vite does that)
-- Vite always outputs ESM in dev, and optimized bundles for production
+- `package.json` tells Node.js to treat `.js` files as ESM (matters for config files like `vite.config.ts` when Node runs them)
+- `tsconfig.json` with `"module": "ESNext"` tells TypeScript to **validate** ESM syntax
+- `noEmit: true` means TypeScript **ONLY validates** - it doesn't transform or emit files
+- Vite (via esbuild) does ALL the actual transpilation and bundling
+- Result: TypeScript's `module` setting is just for validation, not output
 
 ---
 
@@ -595,16 +603,17 @@ Include it in `tsconfig.app.json`:
 | **Used by** | `tsc`, IDEs | Vite dev server & build | Node.js runtime |
 | **Transpilation** | ❌ Not used in Vite | ✅ Uses esbuild | N/A |
 | **Type checking** | ✅ Yes | ❌ No | N/A |
-| **Module format** | Defines what to emit | Uses ESM internally | Tells Node how to interpret .js files |
+| **Module format** | Validates syntax only (with noEmit: true) | Uses ESM internally | Tells Node how to interpret .js files |
 
 ### Key Takeaways
 
 1. **Vite uses esbuild for transpilation, not TypeScript** - That's why it's so fast
 2. **TypeScript is only for type checking** - Set `noEmit: true` in Vite projects
-3. **`package.json` "type": "module"`** - Use this for modern ESM-based projects
-4. **Multiple tsconfig files** - Different configs for app code, Node code, and server code
-5. **Type check before build** - `tsc --noEmit && vite build` prevents shipping type errors
-6. **Path aliases need both configs** - Add to `vite.config.ts` AND `tsconfig.json`
+3. **With `noEmit: true`, `target` and `module` only validate** - They don't affect your production bundle at all
+4. **`package.json` "type": "module"`** - Use this for modern ESM-based projects
+5. **Multiple tsconfig files** - Different configs for app code, Node code, and server code
+6. **Type check before build** - `tsc --noEmit && vite build` prevents shipping type errors
+7. **Path aliases need both configs** - Add to `vite.config.ts` AND `tsconfig.json`
 
 ### Workflow
 

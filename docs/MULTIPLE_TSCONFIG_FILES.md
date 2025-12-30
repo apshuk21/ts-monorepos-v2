@@ -175,14 +175,17 @@ packages/models/
 **`tsconfig.json`** - For development/IDE:
 ```json
 {
-  "extends": "../../tsconfig.json"
+  "extends": "../../tsconfig.json",
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
 }
 ```
 
 **What this means:**
 - When you open `seed-packet.model.ts` in VS Code, TypeScript uses this config
-- Inherits `noEmit: true`, so no files are generated
-- Includes both `src/**/*.ts` AND `tests/**/*.ts` (from root)
+- Inherits `noEmit: true` from root, so no files are generated
+- **Replaces** root's `include` to scope to only this package's `src` and `tests`
+- Used by `pnpm check` command to type-check both source and test files
 - You get type checking for tests while developing
 
 **`tsconfig.build.json`** - For building:
@@ -202,13 +205,25 @@ packages/models/
 **What this means:**
 - `pnpm run build` uses this config
 - **Overrides** `noEmit: false` to actually generate files
-- **Overrides** `include` to ONLY compile `src/` (not tests!)
+- **Replaces** `include` to ONLY compile `src/` (not tests!)
 - Outputs `.js` and `.d.ts` files to `dist/`
 
+**Package.json scripts:**
+```json
+{
+  "scripts": {
+    "check": "tsc -p tsconfig.json",           // Type-check src + tests
+    "build": "tsc -p tsconfig.build.json",     // Build for distribution
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
+  }
+}
+```
+
 **Why separate configs?**
-- ✅ Development: Type-check both source and tests
-- ✅ Production: Only build source files
+- ✅ Development: Type-check both source and tests (`tsconfig.json`)
+- ✅ Production: Only build source files (`tsconfig.build.json`)
 - ✅ Tests don't end up in the distributed package
+- ✅ Each config has a focused, single purpose
 
 ---
 
@@ -217,15 +232,19 @@ packages/models/
 **Structure:**
 ```
 packages/ui/
-├── tsconfig.json           # IDE for config files
+├── tsconfig.json           # Config files only
 ├── tsconfig.app.json       # Svelte application
-├── tsconfig.node.json      # Node.js server
-├── tsconfig.server.json    # Server-specific
+├── tsconfig.node.json      # Vite config file
+├── tsconfig.server.json    # Express server code
 ├── package.json
 ├── src/
 │   ├── App.svelte
-│   └── server/
-│       └── index.ts
+│   ├── lib/
+│   │   └── *.svelte
+│   ├── server/
+│   │   └── index.ts
+│   ├── models/
+│   └── utils/
 ├── vite.config.ts
 ├── svelte.config.js
 └── tailwind.config.js
@@ -233,11 +252,14 @@ packages/ui/
 
 **Why so many tsconfig files?**
 
-The UI package has **three different runtime environments**:
+The UI package has **four different runtime environments**:
 
-1. **Svelte Frontend** (runs in browser)
-2. **Express Server** (runs in Node.js)
-3. **Build Configuration Files** (runs in Node.js at build time)
+1. **Svelte Frontend** (runs in browser) → `tsconfig.app.json`
+2. **Express Server** (runs in Node.js) → `tsconfig.server.json`
+3. **Vite Config** (runs in Node.js at build time) → `tsconfig.node.json`
+4. **Other Config Files** (PostCSS, Tailwind, ESLint) → `tsconfig.json`
+
+---
 
 **`tsconfig.json`** - For config files:
 ```json
@@ -253,7 +275,12 @@ The UI package has **three different runtime environments**:
 }
 ```
 
-**Purpose:** Type-check build configuration files only.
+**Purpose:**
+- Type-check build configuration files only
+- Used by IDE when you open these config files
+- **Replaces** root's `include` to target only config files
+
+---
 
 **`tsconfig.app.json`** - For Svelte app:
 ```json
@@ -262,30 +289,201 @@ The UI package has **three different runtime environments**:
   "compilerOptions": {
     "target": "ESNext",
     "composite": true,
+    "useDefineForClassFields": true,
     "module": "ESNext",
+    "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "moduleDetection": "force"
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
   "exclude": ["**/assets/**/*"]
 }
 ```
 
-**Purpose:** Type-check Svelte components with Svelte-specific settings.
+**Purpose:**
+- Type-check Svelte components with Svelte-specific settings
+- Extends from `@tsconfig/svelte` (community preset for Svelte)
+- Includes all TypeScript, JavaScript, and Svelte files in `src/`
+- Used by `svelte-check` command
 
-**Package.json check script:**
+---
+
+**`tsconfig.node.json`** - For Vite config:
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+```
+
+**Purpose:**
+- Type-check `vite.config.ts` specifically
+- Extends the package's `tsconfig.json` (which extends root)
+- Uses `moduleResolution: "bundler"` for Vite-specific imports
+- **Replaces** include to only target `vite.config.ts`
+
+---
+
+**`tsconfig.server.json`** - For Express server:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/server/**/*",
+    "src/models/**/*",
+    "src/utils/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/assets/**/*"
+  ]
+}
+```
+
+**Purpose:**
+- Type-check Express server code
+- **Does NOT extend** root config (completely standalone)
+- Uses `moduleResolution: "node"` for Node.js
+- Includes server-specific directories
+- Adds `types: ["node"]` for Node.js type definitions
+
+---
+
+**Package.json scripts:**
 ```json
 {
   "scripts": {
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "dev": "concurrently \"pnpm run dev-server\" \"pnpm run dev-client\"",
+    "dev-client": "vite",
+    "build": "vite build"
   }
 }
 ```
 
-This runs:
-1. `svelte-check` with `tsconfig.app.json` for Svelte files
-2. `tsc` with `tsconfig.node.json` for Node.js server files
+**What the check script does:**
+1. `svelte-check --tsconfig ./tsconfig.app.json` - Type-check Svelte components
+2. `tsc -p tsconfig.node.json` - Type-check vite.config.ts
+
+**Note:** The server code (`tsconfig.server.json`) is type-checked separately or by IDE.
+
+---
+
+**Why this complex setup?**
+- ✅ **Svelte code** needs Svelte-specific compiler options
+- ✅ **Server code** needs Node.js types and different module resolution
+- ✅ **Config files** need to be type-checked but with different includes
+- ✅ **Vite config** needs bundler-specific module resolution
+- ✅ Each environment has distinct requirements that can't share a single config
+
+---
+
+### Example 3: @seeds/server Package
+
+**Structure:**
+```
+packages/server/
+├── tsconfig.json           # IDE and type checking
+├── tsconfig.build.json     # Building for production
+├── package.json
+├── src/
+│   ├── index.ts
+│   ├── routes/
+│   └── middleware/
+├── tests/
+│   └── api.test.ts
+└── data/
+    └── seeds.yaml
+```
+
+**`tsconfig.json`** - For development/IDE:
+```json
+{
+  "extends": "../../tsconfig.json",
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+**Purpose:**
+- Type-check both source and test files during development
+- Used by `pnpm check` command
+- **Replaces** root's `include` to scope to this package only
+- Inherits all `compilerOptions` from root (including `noEmit: true`)
+
+**`tsconfig.build.json`** - For building:
+```json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true
+  },
+  "include": ["src"]
+}
+```
+
+**Purpose:**
+- Compile TypeScript to JavaScript for production
+- **Overrides** `noEmit: false` to actually emit files
+- **Replaces** `include` to only build `src/` (excludes tests)
+- Generates `.js` and `.d.ts` files in `dist/`
+
+**Package.json scripts:**
+```json
+{
+  "scripts": {
+    "check": "tsc -p tsconfig.json",           // Type-check src + tests
+    "build": "tsc -p tsconfig.build.json",     // Build for production
+    "dev": "tsx --watch --watch-preserve-output ./src/index.ts"
+  }
+}
+```
+
+**Why separate configs?**
+- ✅ **Development**: Check both source and tests for errors
+- ✅ **Production**: Only compile source code to `dist/`
+- ✅ **Simple pattern**: Same as models package, but for a Node.js server
+
+**Key difference from models package:**
+- Server package is the **entry point** - it runs as a standalone application
+- Models package is a **library** - it's imported by other packages
+- Both use the same two-config pattern: one for checking, one for building
 
 ---
 
@@ -577,22 +775,52 @@ Create a new tsconfig when you have:
 
 ```
 ts-monorepos-v2/
-├── tsconfig.json                    # Root: Shared settings for all
+├── tsconfig.json                    # Root: Shared settings for all packages
 │
 ├── packages/
-│   ├── models/
-│   │   ├── tsconfig.json           # IDE: Inherits root
-│   │   ├── tsconfig.build.json     # Build: Emits .js + .d.ts
-│   │   └── package.json
-│   │       └── "build": "tsc -p tsconfig.build.json"
+│   ├── models/                      # Shared library package
+│   │   ├── tsconfig.json           # Check: src + tests (noEmit: true)
+│   │   ├── tsconfig.build.json     # Build: src only → dist/
+│   │   ├── package.json
+│   │   │   ├── "check": "tsc -p tsconfig.json"
+│   │   │   └── "build": "tsc -p tsconfig.build.json"
+│   │   ├── src/
+│   │   └── tests/
 │   │
-│   └── ui/
-│       ├── tsconfig.json           # Config files only
-│       ├── tsconfig.app.json       # Svelte app
-│       ├── tsconfig.node.json      # Node.js server
-│       └── package.json
-│           └── "check": "svelte-check --tsconfig ./tsconfig.app.json"
+│   ├── server/                      # Node.js API server
+│   │   ├── tsconfig.json           # Check: src + tests (noEmit: true)
+│   │   ├── tsconfig.build.json     # Build: src only → dist/
+│   │   ├── package.json
+│   │   │   ├── "check": "tsc -p tsconfig.json"
+│   │   │   ├── "build": "tsc -p tsconfig.build.json"
+│   │   │   └── "dev": "tsx --watch ./src/index.ts"
+│   │   ├── src/
+│   │   └── tests/
+│   │
+│   └── ui/                          # Svelte frontend + Express server
+│       ├── tsconfig.json           # Config files (Tailwind, PostCSS, etc.)
+│       ├── tsconfig.app.json       # Svelte app (extends @tsconfig/svelte)
+│       ├── tsconfig.node.json      # Vite config file
+│       ├── tsconfig.server.json    # Express server code (standalone)
+│       ├── package.json
+│       │   ├── "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+│       │   ├── "build": "vite build"
+│       │   └── "dev": "concurrently \"dev-server\" \"vite\""
+│       └── src/
+│           ├── App.svelte
+│           ├── lib/
+│           ├── server/
+│           ├── models/
+│           └── utils/
 ```
+
+**Package Type Summary:**
+
+| Package | Configs | Pattern | Purpose |
+|---------|---------|---------|---------|
+| **models** | 2 configs | Standard library | Shared types/models for all packages |
+| **server** | 2 configs | Standard library | Standalone Node.js API server |
+| **ui** | 4 configs | Complex multi-env | Svelte app + Express server + configs |
 
 ---
 

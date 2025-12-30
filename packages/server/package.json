@@ -1,20 +1,17 @@
 {
-    "name": "@seeds/models",
+    "name": "@seeds/server",
     "private": true,
     "version": "0.0.2",
     "type": "module",
-    "types": "dist/index.d.ts",
-    "module": "dist/index.js",
     "scripts": {
+		"dev": "tsx --watch --watch-preserve-output ./src/index.ts",
 		"check": "tsc -p tsconfig.json",
         "test": "vitest run",
 		"test:watch": "vitest",
 		"test:ui": "vitest --ui",
 		"test:coverage": "vitest run --coverage",
 		"lint": "eslint .",
-        "build": "tsc -p tsconfig.build.json",
-        "//dev": "tsx --watch --watch-preserve-output src/index.ts",
-        "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
+        "build": "tsc -p tsconfig.build.json"
     },
     "devDependencies": {
 		"@eslint/js": "^9.28.0",
@@ -31,6 +28,7 @@
 		"vitest": "^3.2.3"
 	},
 	"dependencies": {
+		"@seeds/models": "workspace:*",
 		"cors": "^2.8.5",
 		"express": "^5.1.0",
 		"winston": "^3.17.0",

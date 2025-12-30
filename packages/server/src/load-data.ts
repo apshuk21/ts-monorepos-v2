@@ -1,7 +1,7 @@
 import * as yaml from 'yaml'
 import * as fs from 'fs'
 import path from 'path'
-import type { SeedPacketCollectionModel } from '../models/seed-packet-collection.model.js'
+import type { SeedPacketCollectionModel } from '@seeds/models'
 
 const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'seeds.yml')
 
